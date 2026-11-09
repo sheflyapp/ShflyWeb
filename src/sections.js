@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { View, Image, Pressable, Linking, StyleSheet } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Image, Pressable, Linking, StyleSheet, Animated, useWindowDimensions, Platform } from 'react-native';
+import { Ionicons, MaterialCommunityIcons, FontAwesome6 } from '@expo/vector-icons';
 import { colors, shadow } from './theme';
 import { T, Container, Button, StoreBadge, Logo, SectionTitle, useLayout } from './ui';
 import { navLinks, services, steps, testimonials, faqs, STORE_LINKS } from './data';
@@ -9,9 +9,21 @@ import { navLinks, services, steps, testimonials, faqs, STORE_LINKS } from './da
 export function Header({ onNav, active }) {
   const { isDesktop } = useLayout();
   const [open, setOpen] = useState(false);
+  const [headerH, setHeaderH] = useState(72);
+  const [mounted, setMounted] = useState(false); // drawer stays out of the page until first opened and after it closes
+  const { width: winW } = useWindowDimensions();
+  const drawerW = Math.min(300, winW * 0.8);
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (open) setMounted(true);
+    Animated.timing(anim, { toValue: open ? 1 : 0, duration: 250, useNativeDriver: false }).start(({ finished }) => {
+      if (finished && !open) setMounted(false);
+    });
+  }, [open]);
+  useEffect(() => { if (isDesktop) setOpen(false); }, [isDesktop]);
   const go = (k) => { setOpen(false); onNav(k); };
   return (
-    <View style={st.header}>
+    <View style={st.header} onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}>
       <Container style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 }}>
         <Pressable onPress={() => go('home')}><Logo /></Pressable>
         {isDesktop ? (
@@ -32,14 +44,19 @@ export function Header({ onNav, active }) {
           ) : null}
         </View>
       </Container>
-      {open && !isDesktop ? (
-        <Container style={{ paddingBottom: 14, gap: 4 }}>
-          {navLinks.map((l) => (
-            <Pressable key={l.key} onPress={() => go(l.key)} style={st.mobileLink}>
-              <T size={16} weight="600" color={active === l.key ? colors.orange : colors.text}>{l.label}</T>
-            </Pressable>
-          ))}
-        </Container>
+      {!isDesktop && mounted ? (
+        <View pointerEvents={open ? 'auto' : 'none'} style={[st.drawerLayer, { top: headerH }]}>
+          <Animated.View style={[st.backdrop, { opacity: anim }]}>
+            <Pressable style={{ flex: 1 }} onPress={() => setOpen(false)} accessibilityLabel="إغلاق القائمة" />
+          </Animated.View>
+          <Animated.View style={[st.drawer, { width: drawerW, transform: [{ translateX: anim.interpolate({ inputRange: [0, 1], outputRange: [drawerW, 0] }) }] }]}>
+            {navLinks.map((l) => (
+              <Pressable key={l.key} onPress={() => go(l.key)} style={st.mobileLink}>
+                <T size={16} weight="600" color={active === l.key ? colors.orange : colors.text}>{l.label}</T>
+              </Pressable>
+            ))}
+          </Animated.View>
+        </View>
       ) : null}
     </View>
   );
@@ -68,7 +85,9 @@ export function Hero() {
           </View>
         </View>
         <View style={{ flex: isDesktop ? 1.05 : undefined, width: '100%', maxWidth: 620 }}>
-          <Image source={require('../assets/hero.png')} style={{ width: '100%', aspectRatio: 580 / 486, borderRadius: 28 }} resizeMode="cover" accessibilityLabel="الهدهد وتطبيق شفلي" />
+          <View style={{ width: '100%', aspectRatio: 512 / 250, borderRadius: 28, overflow: 'hidden' }}>
+            <Image source={require('../assets/hero.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" accessibilityLabel="الهدهد وتطبيق شفلي" />
+          </View>
         </View>
       </Container>
     </View>
@@ -216,18 +235,18 @@ export function Footer({ onNav }) {
     { icon: 'logo-linkedin', url: 'https://linkedin.com' },
     { icon: 'logo-youtube', url: 'https://youtube.com' },
     { icon: 'logo-instagram', url: 'https://instagram.com' },
-    { icon: 'logo-x', url: 'https://x.com' },
+    { icon: 'x-twitter', url: 'https://x.com', fa6: true },
   ];
   return (
     <View style={{ backgroundColor: colors.brown }}>
       <Container style={{ paddingVertical: 48, gap: 32 }}>
         <View style={{ flexDirection: isDesktop ? 'row' : 'column', alignItems: 'center', justifyContent: 'space-between', gap: 28 }}>
           <View style={{ alignItems: 'center', gap: 16 }}>
-            <Logo light />
+            <Logo size={1.4} />
             <View style={{ flexDirection: 'row', gap: 16 }}>
               {socials.map((so) => (
                 <Pressable key={so.icon} onPress={() => Linking.openURL(so.url)} style={({ hovered }) => [st.social, hovered && { backgroundColor: colors.orange }]}>
-                  <Ionicons name={so.icon} size={18} color="#fff" />
+                  {so.fa6 ? <FontAwesome6 name={so.icon} size={16} color="#fff" /> : <Ionicons name={so.icon} size={18} color="#fff" />}
                 </Pressable>
               ))}
             </View>
@@ -270,7 +289,11 @@ const st = StyleSheet.create({
   navItem: { paddingVertical: 6, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   navActive: { borderBottomColor: colors.orange },
   menuBtn: { padding: 8, borderRadius: 10, backgroundColor: colors.orangeTint },
-  mobileLink: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  mobileLink: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+  // fixed to the viewport on web so it overlays the page without shifting layout
+  drawerLayer: { position: Platform.OS === 'web' ? 'fixed' : 'absolute', left: 0, right: 0, bottom: 0, overflow: 'hidden', zIndex: 1000 },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(46,21,23,0.45)' },
+  drawer: { position: 'absolute', top: 0, bottom: 0, right: 0, backgroundColor: colors.page, paddingHorizontal: 20, paddingTop: 8, gap: 4, ...shadow },
   wave: {
     position: 'absolute', left: -200, right: -200, height: 120,
     backgroundColor: colors.orange, opacity: 0.9, borderRadius: 400,
