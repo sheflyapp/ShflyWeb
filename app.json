@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "شفلي | SHFLY",
+    "slug": "shfly-web",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "شفلي | كل الخدمات اللي تحتاجها في مكان واحد",
+      "shortName": "شفلي",
+      "lang": "ar",
+      "themeColor": "#FC6B3A",
+      "backgroundColor": "#FFF8F1"
+    }
+  }
+}
